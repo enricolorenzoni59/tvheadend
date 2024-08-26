@@ -139,6 +139,7 @@ struct iptv_mux
   int                   mm_iptv_fd;
   udp_connection_t     *mm_iptv_connection;
   char                 *mm_iptv_url;
+  char                 *mm_iptv_http_user_agent;
   char                 *mm_iptv_url_sane;
   char                 *mm_iptv_url_raw;
   char                 *mm_iptv_url_cmpid;
