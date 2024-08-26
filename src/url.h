@@ -35,6 +35,7 @@ typedef struct url
   char  *query;
   char  *frag;
   char  *raw;
+  char  *user_agent;
 } url_t;
 
 static inline void urlinit ( url_t *url ) { memset(url, 0, sizeof(*url)); }

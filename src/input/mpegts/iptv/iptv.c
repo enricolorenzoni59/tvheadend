@@ -388,6 +388,8 @@ iptv_input_start_mux ( mpegts_input_t *mi, mpegts_mux_instance_t *mmi, int weigh
     }
     scheme = url.scheme;
 
+    url.user_agent = im->mm_iptv_http_user_agent;
+
   }
 
   /* Find scheme handler */

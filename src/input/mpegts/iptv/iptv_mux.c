@@ -132,6 +132,12 @@ const idclass_t iptv_mux_class =
       .opts     = PO_MULTILINE
     },
     {
+      .type     = PT_STR,
+      .id       = "iptv_http_user_agent",
+      .name     = N_("HTTP User agent"),
+      .off      = offsetof(iptv_mux_t, mm_iptv_http_user_agent),
+    },
+    {
       .type     = PT_BOOL,
       .id       = "iptv_send_reports",
       .name     = N_("Send RTCP status reports"),
@@ -327,6 +333,7 @@ iptv_mux_free ( mpegts_mux_t *mm )
 {
   iptv_mux_t *im = (iptv_mux_t *)mm;
   free(im->mm_iptv_url);
+  free(im->mm_iptv_http_user_agent);
   free(im->mm_iptv_url_sane);
   free(im->mm_iptv_url_raw);
   free(im->mm_iptv_url_cmpid);

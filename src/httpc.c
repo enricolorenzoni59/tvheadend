@@ -1257,8 +1257,7 @@ http_client_basic_args ( http_client_t *hc, http_arg_list_t *h, const url_t *url
                                         http_port(hc, url->scheme, url->port));
     http_arg_set(h, "Host", buf);
   }
-  assert(config.http_user_agent);
-  http_arg_set(h, "User-Agent", config.http_user_agent);
+  http_arg_set(h, "User-Agent", url->user_agent ?: config.http_user_agent);
   if (!keepalive)
     http_arg_set(h, "Connection", "close");
   http_client_basic_auth(hc, h, url->user, url->pass);
