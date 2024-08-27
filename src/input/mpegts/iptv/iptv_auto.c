@@ -86,11 +86,12 @@ iptv_auto_network_process_m3u_item(iptv_network_t *in,
   http_arg_t *ra1, *ra2, *ra2_next;
   size_t l;
   int64_t chnum2, vlcprog;
-  const char *url, *url2, *name, *logo, *epgid, *tags;
+  const char *url, *url2, *name, *logo, *epgid, *tags, *user_agent;
   char *s;
   char custom[512], name2[128], buf[32], *moduleid, *n;
 
   url = htsmsg_get_str(item, "m3u-url");
+  user_agent = htsmsg_get_str(item, "http-user-agent");
 
   if (url == NULL ||
       (strncmp(url, "file://", 7) &&
@@ -275,6 +276,11 @@ skip_url:
       }
       if (smuxprio >= 0 && im->mm_iptv_streaming_priority != smuxprio) {
         im->mm_iptv_streaming_priority = smuxprio;
+        change = 1;
+      }
+      if (strcmp(im->mm_iptv_http_user_agent ?: "", user_agent ?: "")) {
+        free(im->mm_iptv_http_user_agent);
+        im->mm_iptv_http_user_agent = user_agent ? strdup(user_agent) : NULL;
         change = 1;
       }
       if (change)

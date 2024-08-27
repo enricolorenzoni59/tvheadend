@@ -130,6 +130,7 @@ htsmsg_t *parse_m3u
   htsmsg_t *m = htsmsg_create_map();
   htsmsg_t *item = NULL, *l = NULL, *t, *key = NULL;
   char buf[512];
+  size_t data_len;
 
   while (*data && *data <= ' ') data++;
   p = data;
@@ -244,6 +245,20 @@ multi:
         item = htsmsg_create_map();
       htsmsg_add_s64(item, "vlc-program", strtoll(data + 19, NULL, 10));
       data = until_eol(data + 19);
+    } else if (strncmp(data, "#EXTVLCOPT:http-user-agent=", strlen("#EXTVLCOPT:http-user-agent=")) == 0) {
+      // move the pointer at the start of the payload
+      data += strlen("#EXTVLCOPT:http-user-agent=");
+      data_len = until_eol(data) - data;
+      if (data_len < sizeof(buf)) {
+        memset(buf, 0, sizeof(buf));
+        // store the user agent in buf
+        memcpy(buf, data, data_len);
+        htsmsg_add_str(item, "http-user-agent", buf);
+      } else {
+        // ignored: too long (malformed or parse error?)
+      }
+      data += data_len;
+      continue;
     } else if (strncmp(data, "#EXT", 4) == 0) {
       data = until_eol(data + 4);
       continue;
