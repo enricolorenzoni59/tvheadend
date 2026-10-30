@@ -338,7 +338,7 @@ static int tvhdhomerun_frontend_tune(tvhdhomerun_frontend_t *hfe, mpegts_mux_ins
   uint32_t symbol_rate = 0;
   uint8_t bandwidth = 0;
   int res;
-  char *perror;
+  char *perror = NULL;
 
   /* resolve the modulation type */
   switch (dmc->dmc_fe_type) {
@@ -412,7 +412,7 @@ static int tvhdhomerun_frontend_tune(tvhdhomerun_frontend_t *hfe, mpegts_mux_ins
   res = hdhomerun_device_tuner_lockkey_request(hfe->hf_hdhomerun_tuner, &perror);
   if(res < 1) {
     tvh_mutex_unlock(&hfe->hf_hdhomerun_device_mutex);
-    tvherror(LS_TVHDHOMERUN, "failed to acquire lockkey: %s", perror);
+    tvherror(LS_TVHDHOMERUN, "failed to acquire lockkey: %s", perror ? perror : "communication error");
     return SM_CODE_TUNING_FAILED;
   }
   
@@ -750,7 +750,7 @@ tvhdhomerun_frontend_wizard_set( tvh_input_t *ti, htsmsg_t *conf, const char *la
 
   mn = tvhdhomerun_frontend_wizard_network(hfe);
   mpegts_network_wizard_create(ntype, &nlist, lang);
-  if (ntype && (mn == NULL || mn->mn_wizard)) {
+  if (nlist && ntype && (mn == NULL || mn->mn_wizard)) {
     htsmsg_add_str(nlist, NULL, ntype);
     mpegts_input_set_networks((mpegts_input_t *)hfe, nlist);
     htsmsg_destroy(nlist);

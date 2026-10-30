@@ -73,7 +73,9 @@ dvr_spawn_fetch_artwork(dvr_entry_t *de)
 int
 dvr_rec_subscribe(dvr_entry_t *de)
 {
-  char buf[100];
+  const char *title;
+  char *buf;
+  size_t buflen;
   int weight;
   profile_t *pro;
   profile_chain_t *prch = NULL;
@@ -94,7 +96,14 @@ dvr_rec_subscribe(dvr_entry_t *de)
     pri = DVR_PRIO_NORMAL;
   weight = prio2weight[pri];
 
-  snprintf(buf, sizeof(buf), "DVR: %s", lang_str_get(de->de_title, NULL));
+  /* Size the buffer to the actual title so long multibyte titles
+   * (CJK, emoji) aren't truncated mid-UTF-8 — a partial codepoint
+   * would otherwise break the comet/ws JSON feed. */
+  title = lang_str_get(de->de_title, NULL);
+  if (title == NULL) title = "";
+  buflen = strlen(title) + sizeof("DVR: ");
+  buf = alloca(buflen);
+  snprintf(buf, buflen, "DVR: %s", title);
 
   if (de->de_owner && de->de_owner[0] != '\0') {
     aa = access_get_by_username(de->de_owner);
@@ -1193,6 +1202,8 @@ pvr_generate_filename(dvr_entry_t *de, const streaming_start_t *ss)
     *(dirsep - 1) = '\0';
     if (*x) {
       s = cleanup_filename(cfg, x, dir_dosubs);
+      if (s == NULL)
+        return -1;
       tvh_strlcatf(filename, sizeof(filename), j, "%s/", s);
       free(s);
     }
@@ -1542,7 +1553,12 @@ dvr_thread_global_lock(dvr_entry_t *de, int *run)
     *run = 0;
     return 0;
   }
-  tvh_mutex_lock(&global_lock);
+  while (tvh_mutex_timedlock(&global_lock, 10000)) {
+    if (atomic_get(&de->de_thread_shutdown) > 1) {
+      *run = 0;
+      return 0;
+    }
+  }
   return 1;
 }
 
@@ -1658,8 +1674,10 @@ dvr_thread_rec_start(dvr_entry_t **_de, streaming_start_t *ss,
     if(code == 0) {
       ret = 1;
       *started = 1;
-    } else
-      dvr_stop_recording(de, code == SM_CODE_NO_SPACE ? SM_CODE_NO_SPACE : SM_CODE_INVALID_TARGET, 1, 0);
+    } else {
+      /* dvr_stop_recording() would join this very thread */
+      dvr_stop_recording_deferred(de, code == SM_CODE_NO_SPACE ? SM_CODE_NO_SPACE : SM_CODE_INVALID_TARGET);
+    }
     dvr_thread_global_unlock(de);
   }
   return ret;

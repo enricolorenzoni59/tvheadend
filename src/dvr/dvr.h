@@ -78,6 +78,7 @@ typedef struct dvr_config {
   int dvr_clone;
   int dvr_complex_scheduling;
   uint32_t dvr_rerecord_errors;
+  uint32_t dvr_max_data_errors;
   uint32_t dvr_retention_days;
   uint32_t dvr_removal_days;
   uint32_t dvr_removal_after_playback;
@@ -557,6 +558,13 @@ uint32_t dvr_entry_get_removal_days( dvr_entry_t *de );
 
 uint32_t dvr_entry_get_rerecord_errors( dvr_entry_t *de );
 
+static inline uint32_t dvr_entry_get_max_data_errors( dvr_entry_t *de )
+  { return de->de_config ? de->de_config->dvr_max_data_errors : DVR_MAX_DATA_ERRORS; }
+
+static inline int dvr_entry_data_error_limit_reached( dvr_entry_t *de )
+  { uint32_t max_data_errors = dvr_entry_get_max_data_errors(de);
+    return max_data_errors && de->de_data_errors >= max_data_errors; }
+
 int dvr_entry_get_epg_running( dvr_entry_t *de );
 
 time_t dvr_entry_get_start_time( dvr_entry_t *de, int warm );
@@ -610,6 +618,8 @@ dvr_entry_update( dvr_entry_t *de, int enabled,
 void dvr_destroy_by_channel(channel_t *ch, int delconf);
 
 void dvr_stop_recording(dvr_entry_t *de, int stopcode, int saveconf, int clone);
+
+void dvr_stop_recording_deferred(dvr_entry_t *de, int stopcode);
 
 int dvr_rec_subscribe(dvr_entry_t *de);
 

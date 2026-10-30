@@ -154,7 +154,7 @@ const char      *tvheadend_cwd0;
 const char      *tvheadend_cwd;
 const char      *tvheadend_webroot;
 const tvh_caps_t tvheadend_capabilities[] = {
-#if ENABLE_CWC || ENABLE_CAPMT || ENABLE_CONSTCW || ENABLE_CCCAM
+#if ENABLE_CWC || ENABLE_CAPMT || ENABLE_CONSTCW || ENABLE_CCCAM || ENABLE_LINUXDVB_CA
   { "caclient", NULL },
 #endif
 #if ENABLE_LINUXDVB || ENABLE_SATIP_CLIENT || ENABLE_HDHOMERUN_CLIENT
@@ -1072,10 +1072,14 @@ main(int argc, char **argv)
     }
     if (tmp[strlen(tmp)-1] == '/')
       tmp[strlen(tmp)-1] = '\0';
-    if (tmp[0])
+    if (tmp[0]) {
       tvheadend_webroot = tmp;
-    else
+    } else {
+      /* "/" or "" normalise to no webroot at all — leaving the raw
+       * value would prefix every registered route with it. */
       free(tmp);
+      tvheadend_webroot = NULL;
+    }
   }
   tvheadend_webui_debug = opt_uidebug;
 

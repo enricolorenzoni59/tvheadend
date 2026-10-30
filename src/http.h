@@ -174,6 +174,7 @@ typedef struct http_connection {
   char *hc_password;
   char *hc_authhdr;
   char *hc_nonce;
+  int   hc_nonce_stale;   /* the request carried a nonce we no longer know */
   access_t *hc_access;
   enum {
     HC_AUTH_NONE,
@@ -242,6 +243,9 @@ int http_header_match(http_connection_t *hc, const char *name, const char *value
 void http_output_html(http_connection_t *hc);
 
 void http_output_content(http_connection_t *hc, const char *content);
+
+void http_output_content_disposition(http_connection_t *hc, const char *content,
+                                     const char *disposition);
 
 void http_redirect(http_connection_t *hc, const char *location,
                    struct http_arg_list *req_args, int external);

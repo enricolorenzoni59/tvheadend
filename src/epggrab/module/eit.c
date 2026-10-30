@@ -72,9 +72,10 @@ typedef struct eit_private
 
 #define EIT_CONV_HUFFMAN            1
 
-#define EIT_HACK_INTEREST4E         (1<<0)
-#define EIT_HACK_EXTRAMUXLOOKUP     (1<<1)
-#define EIT_HACK_SVCNETLOOKUP       (1<<2)
+#define EIT_HACK_INTEREST4E           (1<<0)
+#define EIT_HACK_EXTRAMUXLOOKUP       (1<<1)
+#define EIT_HACK_SVCNETLOOKUP         (1<<2)
+#define EIT_HACK_USE_MUX_TSID_FOR_EIT (1<<3)
 
 /* Queued data structure */
 typedef struct eit_data
@@ -1202,6 +1203,18 @@ _eit_callback
   /* Basic info */
   sid     = ptr[0] << 8 | ptr[1];
   tsid    = ptr[5] << 8 | ptr[6];
+  
+  //If the 'EIT_HACK_USE_MUX_TSID_FOR_EIT' / 'use-mux-tsid-for-eit' hack is enabled
+  //via the EIT grabber config file, overwrite the EIT TSID with the Mux TSID.
+  //For this to work, 'EIT_HACK_SVCNETLOOKUP' / 'svc-net-lookup' also needs to be set.
+  //Used for NZ because EPG in areas outside of Auckland still use Auckland's TSID in the EIT.
+  //https://freeviewnz.tv/Media/o4pp5qwe/freeview-specification-2022-v15.pdf
+
+  if((hacks & EIT_HACK_USE_MUX_TSID_FOR_EIT) !=0)
+  {
+    tsid = mt->mt_mux->mm_tsid;
+  }
+
   onid    = ptr[7] << 8 | ptr[8];
   seg     = ptr[9];
   extraid = ((uint32_t)tsid << 16) | sid;
@@ -1285,8 +1298,54 @@ svc_ok:
   if (!LIST_FIRST(&svc->s_channels))
     goto done;
 
-  if (svc->s_dvb_ignore_eit)
+  /* Apply the effective EIT processing policy for this service:
+   * the per-service value, falling back to the global default when
+   * the service is set to Default. Tableid ranges in this callback
+   * (see the bounds check earlier in this function) are
+   *   0x4e               actual-TS present/following
+   *   0x50-0x5f          actual-TS schedule
+   *   0x4f, 0x60-0x6f    other-TS present/following + schedule. */
+  int processing = svc->s_dvb_eit_processing;
+  if (processing == EIT_PROCESSING_DEFAULT)
+    processing = epggrab_conf.eit_processing_default;
+
+  switch (processing) {
+  case EIT_PROCESSING_NONE:
     goto done;
+  case EIT_PROCESSING_ACTUAL_ONLY:
+    if (tableid == 0x4f || tableid >= 0x60)
+      goto done;
+    break;
+  case EIT_PROCESSING_OTHER_ONLY:
+    if (tableid == 0x4e || (tableid >= 0x50 && tableid < 0x60))
+      goto done;
+    break;
+  case EIT_PROCESSING_ADAPTIVE:
+    /* Track actual-TS schedule arrival per service. Once seen,
+     * drop further other-TS for it so a neighbouring multiplex's
+     * coarse description cannot overwrite the service's own
+     * detailed schedule. Services whose actual-TS is never
+     * received keep using other-TS, so a dedicated EPG multiplex
+     * still works. P/F (0x4e / 0x4f) is only two events per
+     * service and is not used as the "actual-TS seen" trigger. */
+    if (tableid >= 0x50 && tableid < 0x60) {
+      if (!svc->s_dvb_eit_actual_seen) {
+        svc->s_dvb_eit_actual_seen = 1;
+        tvhtrace(LS_TBL_EIT, "%s: %s actual-TS schedule seen",
+                 mt->mt_name, svc->s_nicename);
+      }
+    } else if ((tableid == 0x4f || tableid >= 0x60) &&
+               svc->s_dvb_eit_actual_seen) {
+      tvhtrace(LS_TBL_EIT,
+               "%s: skip other-TS tid 0x%02X for %s, actual-TS seen",
+               mt->mt_name, tableid, svc->s_nicename);
+      goto done;
+    }
+    break;
+  case EIT_PROCESSING_EITHER:
+  default:
+    break;
+  }
 
   /* Queue events */
   len -= 11;
@@ -1851,7 +1910,9 @@ static void eit_init_one ( const char *id, htsmsg_t *conf )
       else if (strcmp(htsmsg_field_name(f), "extra-mux-lookup") == 0)
         priv->hacks |= EIT_HACK_EXTRAMUXLOOKUP;
       else if (strcmp(htsmsg_field_name(f), "svc-net-lookup") == 0)
-        priv->hacks |= EIT_HACK_EXTRAMUXLOOKUP;
+        priv->hacks |= EIT_HACK_SVCNETLOOKUP;
+      else if (strcmp(htsmsg_field_name(f), "use-mux-tsid-for-eit") == 0)
+        priv->hacks |= EIT_HACK_USE_MUX_TSID_FOR_EIT;
       else if (strcmp(htsmsg_field_name(f), "bat") == 0) {
         if (!(e = htsmsg_field_get_map(f))) continue;
         priv->bat_pid = htsmsg_get_s32_or_default(e, "pid", 0);
